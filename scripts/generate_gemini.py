@@ -6,7 +6,7 @@ import random
 import os, sys
 os.environ["BITSANDBYTES_NOWELCOME"] = "1"
 os.environ["BITSANDBYTES_FORCE_NO_TRITON"] = "1"
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 from settings import *
 import re
 from tqdm import tqdm

@@ -53,13 +53,27 @@ This forces explanations to follow the model’s actual evidence.
 
 ## Project Structure
 
-- `lrp_guidance.py` — main pipeline (generation + intervention)  
-- `generate_gemini.py` — Gemini generation  
-- `generate_gpt.py` — GPT generation  
-- `eval_closed.py` — evaluation for closed models  
-- `utils.py` — prompts, parsing, attention utilities  
-- `settings.py` — configs and templates  
-- `lxt/` — LRP implementation  
+```
+FaithfulSerum/
+│
+├── src/                        # Core library
+│   ├── lxt/                    # PE-LRP implementation
+│   ├── utils.py                # Prompts, parsing, attention utilities
+│   └── settings.py             # Configs and templates
+│
+├── scripts/                    # Experiment scripts
+│   ├── lrp_guidance.py         # Main pipeline (generation + intervention)
+│   ├── generate_gemini.py      # Gemini generation
+│   ├── generate_gpt.py         # GPT generation
+│   └── eval_closed.py          # Evaluation for closed models
+│
+├── examples/                   # Ready-to-run shell commands
+│   ├── generate.sh             # Run closed-source generation
+│   ├── eval_closed.sh          # Evaluate closed-source outputs
+│   └── run_intervention.sh     # Run open-source model with intervention
+│
+└── requirements.txt
+```
 
 ---
 
@@ -78,21 +92,28 @@ pip install -r requirements.txt
 
 ## Usage
 
+Ready-to-run examples are in the `examples/` folder.
+
 ### 1. Generate (closed-source models)
 
-Add your API keys first:
+Add your API keys first, then:
 
-```
-python generate_gemini.py
-python generate_gpt.py
+```bash
+bash examples/generate.sh
 ```
 
 ---
 
 ### 2. Evaluate outputs
 
+```bash
+bash examples/eval_closed.sh
 ```
-python eval_closed.py \
+
+Or with custom arguments:
+
+```bash
+python scripts/eval_closed.py \
     --dataset_specific_name all \
     --eval_model_path Qwen/Qwen2.5-14B-Instruct \
     --verbose \
@@ -103,7 +124,13 @@ python eval_closed.py \
 
 ### 3. Run with intervention (open-source models)
 
+```bash
+bash examples/run_intervention.sh
 ```
+
+Or with custom arguments:
+
+```bash
 python -u scripts/lrp_guidance.py \
     --dataset_specific_name all \
     --num_of_examples 2000 \
