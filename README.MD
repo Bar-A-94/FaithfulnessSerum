@@ -1,57 +1,74 @@
-# Faithfulness Serum
+<div align="center">
 
-🚀 Accepted to ACL 2026 (Main Conference)
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f2027,50:203a43,100:2c5364&height=190&section=header&text=Faithfulness%20Serum%20%F0%9F%92%89&fontSize=46&fontColor=ffffff&fontAlignY=36&animation=fadeIn&desc=Making%20LLM%20explanations%20tell%20the%20truth&descSize=17&descAlignY=58" width="100%" />
 
-LLMs can give an answer  
-and then explain it for the wrong reason.
+<a href="https://2026.aclweb.org/"><img src="https://2026.aclweb.org/assets/images/logos/acl-logo.png" width="200" alt="ACL 2026" /></a>
 
-This repo studies that gap and introduces a simple way to fix it.
+**ACL 2026 · Main Conference**
 
-📄 Paper: https://arxiv.org/abs/2604.14325  
+**Bar Alon · Itamar Zimerman · Lior Wolf**
 
----
+<a href="https://aclanthology.org/2026.acl-long.300/"><img src="https://img.shields.io/badge/Paper-ACL%20Anthology-30363d?style=for-the-badge&logo=bookstack&logoColor=white" /></a>
+<a href="https://arxiv.org/abs/2604.14325"><img src="https://img.shields.io/badge/arXiv-2604.14325-30363d?style=for-the-badge&logo=arxiv&logoColor=B31B1B" /></a>
+<img src="https://img.shields.io/badge/Python-3.9+-30363d?style=for-the-badge&logo=python&logoColor=FFD43B" />
+<img src="https://img.shields.io/badge/PyTorch-30363d?style=for-the-badge&logo=pytorch&logoColor=EE4C2C" />
 
-## What is this?
+</div>
 
-Large language models can be influenced by subtle hints.
+<br/>
 
-But when you ask *why*, their explanations often do not reflect the real cause.
+> [!NOTE]
+> **LLMs can give an answer and then explain it for the wrong reason.**
+> This repo measures that gap and introduces a training-free way to close it.
 
-We show this systematically using counterfactuals, and introduce a method to fix it.
+## 💡 Key idea
 
-We call it **Faithfulness Serum**.
+We turn faithfulness into a **causal test**:
 
----
+1. ❓ Ask a question
+2. 🤫 Add a hidden hint that changes the answer
+3. 🗣️ Ask the model to explain
 
-## What does this repo do?
+If the explanation ignores the hint, it is **not faithful**.
 
-- 🔍 Measure explanation faithfulness using counterfactuals  
-- 🧪 Test how models respond to misleading hints  
-- 🧠 Improve explanations with attention-level interventions  
-- 📊 Evaluate results across models and datasets  
+Then we fix it: compute token attributions with **PE-LRP** and **inject them into attention** while the model writes its explanation. This forces the explanation to follow the model's actual evidence.
 
----
+```mermaid
+flowchart LR
+    Q["❓ Question"] --> H["🤫 + Hidden hint"]
+    H --> A["🎯 Answer flips"]
+    A --> E["🗣️ Explanation"]
+    E --> C{"Mentions the hint?"}
+    C -- "No" --> U["❌ Unfaithful"]
+    C -- "Yes" --> F["✅ Faithful"]
+    S["💉 Serum<br/>PE-LRP attributions<br/>→ attention guidance"] -. "steers" .-> E
+    style S fill:#2c5364,stroke:#5FB3C9,color:#fff
+    style F fill:#1f6f4a,stroke:#2ea043,color:#fff
+    style U fill:#6e2a2a,stroke:#f85149,color:#fff
+```
 
-## Key Idea
+## 📊 At a glance
 
-We turn faithfulness into a causal test:
+<div align="center">
 
-1. Ask a question  
-2. Add a hidden hint that changes the answer  
-3. Ask the model to explain  
+| 🚀 Faithfulness gain | 📚 Benchmarks | 🧩 Hint types | 🤖 Models |
+|:-:|:-:|:-:|:-:|
+| **up to ~100%** | **5** | **4** | **GPT-4o · Gemini 2.0 Flash · Llama 3.1 · Qwen 2.5** |
 
-If the explanation ignores the hint, it is not faithful.
+</div>
 
-Then we fix this by:
+Training-free · inference-time only · no extra models.
 
-- Computing token attributions (PE-LRP)  
-- Injecting them into attention during explanation generation  
+## 🧰 What's inside
 
-This forces explanations to follow the model’s actual evidence.
+| | |
+|:-:|---|
+| 🔍 | Measure explanation faithfulness with counterfactuals |
+| 🧪 | Test how models respond to misleading hints |
+| 🧠 | Improve explanations with attention-level interventions |
+| 📊 | Evaluate results across models and datasets |
 
----
-
-## Project Structure
+## 🗂️ Project structure
 
 ```
 FaithfulSerum/
@@ -75,26 +92,22 @@ FaithfulSerum/
 └── requirements.txt
 ```
 
----
+## ⚙️ Setup
 
-## Setup
+Requires **Python 3.9+**.
 
-Requirements:
-- Python 3.9+
-
-Install dependencies:
-
-```
+```bash
 pip install -r requirements.txt
 ```
 
----
+## 🚀 Usage
 
-## Usage
+Ready-to-run examples live in [`examples/`](examples/).
 
-Ready-to-run examples are in the `examples/` folder.
+<details open>
+<summary><b>1️⃣ Generate (closed-source models)</b></summary>
 
-### 1. Generate (closed-source models)
+<br/>
 
 Add your API keys first, then:
 
@@ -102,9 +115,12 @@ Add your API keys first, then:
 bash examples/generate.sh
 ```
 
----
+</details>
 
-### 2. Evaluate outputs
+<details open>
+<summary><b>2️⃣ Evaluate outputs</b></summary>
+
+<br/>
 
 ```bash
 bash examples/eval_closed.sh
@@ -120,9 +136,12 @@ python scripts/eval_closed.py \
     --eval_file_path <YOUR_GENERATION_FILE>
 ```
 
----
+</details>
 
-### 3. Run with intervention (open-source models)
+<details open>
+<summary><b>3️⃣ Run with intervention (open-source models)</b></summary>
+
+<br/>
 
 ```bash
 bash examples/run_intervention.sh
@@ -142,43 +161,31 @@ python -u scripts/lrp_guidance.py \
     --hint_type sycophancy
 ```
 
----
+</details>
 
-## Notes
+> [!TIP]
+> `alpha` controls the intervention strength. Too low → no effect. Too high → unstable or repetitive outputs. The best results sit in a narrow range.
 
-- `alpha` controls intervention strength  
-- Too low → no effect  
-- Too high → unstable or repetitive outputs  
-- Best results are in a narrow range  
+## 🎯 Why this matters
 
----
+Text explanations are widely used for transparency. If they don't reflect the real decision process, they can mislead. This work moves toward explanations you can actually **trust**.
 
-## Why this matters
+## 📝 Citation
 
-Text explanations are widely used for transparency.
-
-But if they do not reflect the real decision process, they can be misleading.
-
-This work moves toward explanations you can actually trust.
-
----
-
-## Citation
-
-```
+```bibtex
 @misc{alon2026faithfulnessserummitigatingfaithfulness,
-      title={Faithfulness Serum: Mitigating the Faithfulness Gap in Textual Explanations of LLM Decisions via Attribution Guidance}, 
+      title={Faithfulness Serum: Mitigating the Faithfulness Gap in Textual Explanations of LLM Decisions via Attribution Guidance},
       author={Bar Alon and Itamar Zimerman and Lior Wolf},
       year={2026},
       eprint={2604.14325},
       archivePrefix={arXiv},
       primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2604.14325}, 
+      url={https://arxiv.org/abs/2604.14325},
 }
 ```
 
----
+## 💬 Contact
 
-## Contact
+Questions? Open an [issue](../../issues) or reach out.
 
-Feel free to open an issue or reach out if you have questions.
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:2c5364,50:203a43,100:0f2027&height=100&section=footer" width="100%" />
