@@ -1,12 +1,15 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f2027,50:203a43,100:2c5364&height=190&section=header&text=Faithfulness%20Serum%20%F0%9F%92%89&fontSize=46&fontColor=ffffff&fontAlignY=36&animation=fadeIn&desc=Making%20LLM%20explanations%20tell%20the%20truth&descSize=17&descAlignY=58" width="100%" />
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f2027,50:203a43,100:2c5364&height=190&section=header&text=Faithfulness%20Serum%20%F0%9F%92%89&fontSize=46&fontColor=ffffff&fontAlignY=36&animation=fadeIn&desc=Mitigating%20the%20Faithfulness%20Gap%20in%20Textual%20Explanations%20of%20LLM%20Decisions&descSize=15&descAlignY=58" width="100%" />
 
 <a href="https://2026.aclweb.org/"><img src="https://2026.aclweb.org/assets/images/logos/acl-logo.png" width="200" alt="ACL 2026" /></a>
 
 **ACL 2026 · Main Conference**
 
-**Bar Alon · Itamar Zimerman · Lior Wolf**
+**Bar Alon · Itamar Zimerman · Lior Wolf**<br/>
+<sub>Blavatnik School of Computer Science, Tel Aviv University</sub>
+
+<br/>
 
 <a href="https://aclanthology.org/2026.acl-long.300/"><img src="https://img.shields.io/badge/Paper-ACL%20Anthology-30363d?style=for-the-badge&logo=bookstack&logoColor=white" /></a>
 <a href="https://arxiv.org/abs/2604.14325"><img src="https://img.shields.io/badge/arXiv-2604.14325-30363d?style=for-the-badge&logo=arxiv&logoColor=B31B1B" /></a>
@@ -18,55 +21,90 @@
 <br/>
 
 > [!NOTE]
-> **LLMs can give an answer and then explain it for the wrong reason.**
-> This repo measures that gap and introduces a training-free way to close it.
+> **LLMs explain their decisions, but the explanation often isn't the real reason.**
+> We measure this *epistemic faithfulness* gap with counterfactual hints, and close it with **Faithfulness Serum**: a training-free, attention-level intervention guided by a faithful attribution method (PE-LRP).
 
-## 💡 Key idea
+<p align="center">
+  <img src="https://arxiv.org/html/2604.14325v1/new_main-2.png" width="430" alt="Faithfulness Serum overview" />
+  <br/>
+  <sub><b>Figure 1.</b> A hidden hint (professor indication) flips the model's answer. Without the Serum, the explanation ignores the hint. With the Serum, it credits it.</sub>
+</p>
 
-We turn faithfulness into a **causal test**:
+## 🔬 Measuring faithfulness with counterfactuals
 
-1. ❓ Ask a question
-2. 🤫 Add a hidden hint that changes the answer
-3. 🗣️ Ask the model to explain
+Explanations have no ground truth, so we build one with a causal test:
 
-If the explanation ignores the hint, it is **not faithful**.
+1. ❓ **Ask** a multiple-choice question and record the answer.
+2. 🤫 **Re-ask with a hint** pointing to a different option, e.g. *"A Stanford professor indicates the answer is C."*
+3. 🔁 **Keep only flips.** If the answer changes to the hinted option, the hint *caused* the decision.
+4. 🗣️ **Ask for an explanation** and check whether it acknowledges the hint.
 
-Then we fix it: compute token attributions with **PE-LRP** and **inject them into attention** while the model writes its explanation. This forces the explanation to follow the model's actual evidence.
+A faithful explanation **must** mention the hint. We check this with an LLM judge (Qwen2.5-14B-Instruct, ~93% agreement with human raters, κ = 0.84) and a keyword-based Counterfactual Test.
 
-```mermaid
-flowchart LR
-    Q["❓ Question"] --> H["🤫 + Hidden hint"]
-    H --> A["🎯 Answer flips"]
-    A --> E["🗣️ Explanation"]
-    E --> C{"Mentions the hint?"}
-    C -- "No" --> U["❌ Unfaithful"]
-    C -- "Yes" --> F["✅ Faithful"]
-    S["💉 Serum<br/>PE-LRP attributions<br/>→ attention guidance"] -. "steers" .-> E
-    style S fill:#2c5364,stroke:#5FB3C9,color:#fff
-    style F fill:#1f6f4a,stroke:#2ea043,color:#fff
-    style U fill:#6e2a2a,stroke:#f85149,color:#fff
+| Hint type | What it looks like |
+|---|---|
+| 🕵️ **Unethical information** | The answer was obtained through unauthorized access |
+| 🏷️ **Metadata** | The answer is hidden in XML-like markup |
+| 🙋 **Sycophancy** | Someone's opinion, e.g. *"A Stanford professor indicates..."* |
+| 💻 **Grader hack** | The answer is hidden in code, e.g. `return answer == "A"` |
+
+## 💉 The Serum
+
+<p align="center">
+  <img src="https://arxiv.org/html/2604.14325v1/method_zoom.png" width="100%" alt="Faithfulness Serum method" />
+  <br/>
+  <sub><b>Figure 2.</b> PE-LRP relevance scores of the question tokens (blue) are scaled by α (purple) and injected into the attention scores of those tokens at selected layers.</sub>
+</p>
+
+1. **Attribute.** Run PE-LRP on the model's answer to get a relevance score **R** ∈ [0, 1] for every question token.
+2. **Inject.** While the model writes its explanation, at every decoding step and in the layers where it commits to its answer (17 to 19 for Llama 3.1 8B, found with logit lens), add the relevance to the attention on the question tokens:
+
+```math
+\mathcal{A}'^{(l)}_i = \mathcal{A}^{(l)}_i + \alpha \cdot \mathcal{R}_i
 ```
 
-## 📊 At a glance
+3. **Dose.** The effect is dose-dependent, hence the name. α is set to the strongest value that keeps the text fluent (distinct-1 ≥ 40%): **0.06** for Llama 3.1 8B and **0.1** for Qwen 2.5 7B. An optional test-time adaptive variant (TTα) tunes α per sample.
 
-<div align="center">
+No training. No extra models. Minimal compute overhead.
 
-| 🚀 Faithfulness gain | 📚 Benchmarks | 🧩 Hint types | 🤖 Models |
-|:-:|:-:|:-:|:-:|
-| **up to ~100%** | **5** | **4** | **GPT-4o · Gemini 2.0 Flash · Llama 3.1 · Qwen 2.5** |
+## 📊 Results
 
-</div>
+### Open-source models: the Serum improves faithfulness
 
-Training-free · inference-time only · no extra models.
+MMLU, 1,000 counterfactuals per hint type, General prompt, LLM judge. Faithfulness (%), **before → after**:
 
-## 🧰 What's inside
+| Hint type | Llama 3.1 8B | Qwen 2.5 7B |
+|---|:-:|:-:|
+| 🕵️ Unethical information | 8.6 → **15.9** | 14.1 → **29.6** |
+| 🏷️ Metadata | 3.0 → **10.0** | 11.6 → **22.3** |
+| 🙋 Sycophancy | 36.1 → **47.7** | 66.3 → **69.1** |
+| 💻 Grader hack | 2.8 → **10.7** | 14.4 → **17.3** |
 
-| | |
-|:-:|---|
-| 🔍 | Measure explanation faithfulness with counterfactuals |
-| 🧪 | Test how models respond to misleading hints |
-| 🧠 | Improve explanations with attention-level interventions |
-| 📊 | Evaluate results across models and datasets |
+The Serum improves faithfulness for **every hint type on both models**, in many cases by nearly 100% relative to the original. Gains are consistent on **CommonsenseQA, SciQ, ARC-C and OpenBookQA** (General prompt) and on **open-ended questions**. Full results, including the Protocol-Specific prompt and the Counterfactual Test, are in the paper.
+
+### Closed-source models: the gap is there too
+
+The intervention needs access to attention, so it can't run on API-only models. We use our benchmark to evaluate them. MMLU, 50 counterfactuals per hint type, General prompt, LLM judge. Faithfulness (%):
+
+| Hint type | GPT-4o | Gemini 2.0 Flash |
+|---|:-:|:-:|
+| 🕵️ Unethical information | 26 | 54 |
+| 🏷️ Metadata | 0 | 0 |
+| 🙋 Sycophancy | 54 | 68 |
+| 💻 Grader hack | 14 | 4 |
+
+Despite strong alignment efforts, state-of-the-art closed models are largely unfaithful too.
+
+### Who gets the credit?
+
+The model is misled more easily by expert roles **and** credits them more often. With hints of the form *"A {occupation} indicates the answer is X"* on Llama 3.1 8B, the Serum raises credit for every role:
+
+| Role | Faithfulness (%) |
+|---|:-:|
+| 🎓 Stanford professor | 21.2 → **43.8** |
+| 🩺 Neurosurgeon | 20.1 → **31.3** |
+| 🚕 Taxi driver | 2.3 → **13.0** |
+| 🛒 Street vendor | 10.7 → **22.7** |
 
 ## 🗂️ Project structure
 
@@ -164,11 +202,7 @@ python -u scripts/lrp_guidance.py \
 </details>
 
 > [!TIP]
-> `alpha` controls the intervention strength. Too low → no effect. Too high → unstable or repetitive outputs. The best results sit in a narrow range.
-
-## 🎯 Why this matters
-
-Text explanations are widely used for transparency. If they don't reflect the real decision process, they can mislead. This work moves toward explanations you can actually **trust**.
+> `alpha` is the dose. Too low → no effect. Too high → unstable or repetitive outputs. The best results sit in a narrow range (0.06 for Llama 3.1 8B, 0.1 for Qwen 2.5 7B).
 
 ## 📝 Citation
 
